@@ -47,26 +47,46 @@ const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       const fragment = window.location.hash;
+      console.log('URL fragment:', fragment);
+      
       if (fragment.includes('session_id=')) {
-        const sessionId = fragment.split('session_id=')[1];
-        try {
-          const response = await axios.post(`${API}/auth/login`, {
-            session_id: sessionId
-          });
-          setUser(response.data.user);
-          toast.success(`Welcome ${response.data.user.name}!`);
-          
-          // Clear the URL fragment
-          window.history.replaceState({}, document.title, window.location.pathname);
-        } catch (error) {
-          toast.error('Authentication failed');
-          console.error('Auth error:', error);
+        const sessionId = fragment.split('session_id=')[1].split('&')[0]; // Handle multiple params
+        console.log('Extracted session ID:', sessionId);
+        
+        if (sessionId && sessionId.trim()) {
+          try {
+            console.log('Attempting authentication with session ID:', sessionId);
+            const response = await axios.post(`${API}/auth/login`, {
+              session_id: sessionId.trim()
+            });
+            
+            console.log('Authentication response:', response.data);
+            setUser(response.data.user);
+            toast.success(`Welcome ${response.data.user.name}!`);
+            
+            // Clear the URL fragment
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (error) {
+            console.error('Authentication error:', error.response?.data || error.message);
+            toast.error(`Authentication failed: ${error.response?.data?.detail || 'Unknown error'}`);
+            setLoading(false);
+          }
+        } else {
+          console.error('Invalid session ID extracted');
+          toast.error('Invalid authentication response');
+          setLoading(false);
         }
+      } else {
+        console.log('No session_id found in URL fragment');
+        setLoading(false);
       }
     };
 
-    handleAuthCallback();
-  }, []);
+    // Only run this on mount and when URL changes
+    if (loading) {
+      handleAuthCallback();
+    }
+  }, [loading]);
 
   const login = () => {
     const redirectUrl = encodeURIComponent(window.location.origin + '/profile');
