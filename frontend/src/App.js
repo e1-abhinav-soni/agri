@@ -97,7 +97,6 @@ const IndiaMap3D = ({ onStateClick }) => {
         color="#374151"
         anchorX="center"
         anchorY="middle"
-        font="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap"
       >
         Click on any state to explore products
       </Text>
