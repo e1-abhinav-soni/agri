@@ -501,18 +501,26 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
         cancel_url = f"{checkout_req.origin_url}/cancel"
         
         # Create checkout session
+        metadata = {
+            "user_session": checkout_req.user_session,
+            "product_ids": ",".join(product_ids),
+            "inr_amount": str(total_amount)
+        }
+        
+        # Add user info only if user is authenticated
+        if current_user:
+            metadata["user_id"] = current_user.id
+            metadata["user_email"] = current_user.email
+        else:
+            metadata["user_id"] = "guest"
+            metadata["user_email"] = "guest"
+        
         checkout_request = CheckoutSessionRequest(
             amount=usd_amount,
             currency="usd",
             success_url=success_url,
             cancel_url=cancel_url,
-            metadata={
-                "user_session": checkout_req.user_session,
-                "user_id": current_user.id if current_user else None,
-                "user_email": current_user.email if current_user else None,
-                "product_ids": ",".join(product_ids),
-                "inr_amount": str(total_amount)
-            }
+            metadata=metadata
         )
         
         session = await stripe_checkout.create_checkout_session(checkout_request)
