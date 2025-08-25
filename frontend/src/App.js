@@ -450,20 +450,44 @@ function App() {
                     </p>
                   </div>
 
-                  {/* 3D Map */}
+                  {/* 3D/2D Map */}
                   <div className="bg-white rounded-3xl shadow-2xl p-8 mb-12" style={{ height: '600px' }}>
-                    <Suspense fallback={<div className="flex items-center justify-center h-full">Loading 3D Map...</div>}>
-                      <Canvas camera={{ position: [0, 0, 8], fov: 75 }}>
-                        <IndiaMap3D onStateClick={handleStateClick} />
-                        <OrbitControls 
-                          enableZoom={true} 
-                          enablePan={true} 
-                          enableRotate={true}
-                          maxDistance={15}
-                          minDistance={5}
-                        />
-                      </Canvas>
-                    </Suspense>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-2xl font-bold text-gray-800">Interactive Map of India</h3>
+                      <button
+                        onClick={() => setUse3DMap(!use3DMap)}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-200"
+                      >
+                        Switch to {use3DMap ? '2D' : '3D'} View
+                      </button>
+                    </div>
+                    <div style={{ height: 'calc(100% - 80px)' }}>
+                      {use3DMap ? (
+                        <Suspense fallback={<IndiaMap2D onStateClick={handleStateClick} />}>
+                          <Canvas 
+                            camera={{ position: [0, 0, 8], fov: 75 }}
+                            onCreated={({ gl }) => {
+                              // Handle WebGL context creation errors
+                              gl.domElement.addEventListener('webglcontextlost', (e) => {
+                                console.warn('WebGL context lost, switching to 2D map');
+                                setUse3DMap(false);
+                              });
+                            }}
+                          >
+                            <IndiaMap3D onStateClick={handleStateClick} />
+                            <OrbitControls 
+                              enableZoom={true} 
+                              enablePan={true} 
+                              enableRotate={true}
+                              maxDistance={15}
+                              minDistance={5}
+                            />
+                          </Canvas>
+                        </Suspense>
+                      ) : (
+                        <IndiaMap2D onStateClick={handleStateClick} />
+                      )}
+                    </div>
                   </div>
 
                   {/* Features Section */}
