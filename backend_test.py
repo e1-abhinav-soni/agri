@@ -150,6 +150,42 @@ class AgriMapAPITester:
         product_id = self.product_ids[0]
         return self.run_test("Remove from Cart", "DELETE", f"cart/{self.session_id}/{product_id}", 200)
 
+    def test_checkout_create_session(self):
+        """Test creating checkout session (Stripe integration)"""
+        # First add a product to cart
+        if not self.product_ids:
+            print("❌ No product IDs available for checkout testing")
+            return False, {}
+        
+        # Add product to cart first
+        product_id = self.product_ids[0]
+        cart_data = {
+            "product_id": product_id,
+            "quantity": 1,
+            "user_session": self.session_id
+        }
+        self.run_test("Add Product for Checkout", "POST", "cart/add", 200, data=cart_data)
+        
+        # Now test checkout session creation
+        checkout_data = {
+            "origin_url": "https://mapfresh-market.preview.emergentagent.com",
+            "user_session": self.session_id
+        }
+        success, response = self.run_test("Create Checkout Session", "POST", "checkout/create-session", 200, data=checkout_data)
+        
+        if success and response:
+            if 'url' in response and 'session_id' in response:
+                print(f"   ✅ Checkout session created with URL and session_id")
+                return success, response
+            else:
+                print(f"   ⚠️  Missing 'url' or 'session_id' in response")
+        
+        return success, response
+
+    def test_checkout_status_invalid(self):
+        """Test checkout status with invalid session ID"""
+        return self.run_test("Get Invalid Checkout Status", "GET", "checkout/status/invalid_session_id", 404)
+
     def test_invalid_endpoints(self):
         """Test error handling for invalid endpoints"""
         print("\n🔍 Testing Error Handling...")
