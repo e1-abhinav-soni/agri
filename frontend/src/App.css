@@ -81,6 +81,22 @@ button:active {
   animation: spin 1s linear infinite;
 }
 
+/* Enhanced state cards for 2D map */
+.state-card {
+  width: 200px;
+  height: 120px;
+  padding: 1rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
 /* Custom gradient backgrounds */
 .bg-gradient-to-br {
   background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
@@ -105,16 +121,6 @@ button:active {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
-/* State-specific color scheme */
-.state-punjab { background: linear-gradient(135deg, #22c55e, #16a34a); }
-.state-maharashtra { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-.state-kerala { background: linear-gradient(135deg, #10b981, #059669); }
-.state-tamil-nadu { background: linear-gradient(135deg, #f59e0b, #d97706); }
-.state-karnataka { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
-.state-west-bengal { background: linear-gradient(135deg, #ef4444, #dc2626); }
-.state-gujarat { background: linear-gradient(135deg, #06b6d4, #0891b2); }
-.state-rajasthan { background: linear-gradient(135deg, #f97316, #ea580c); }
-
 /* Responsive design */
 @media (max-width: 768px) {
   .container {
@@ -128,6 +134,12 @@ button:active {
   
   .text-4xl {
     font-size: 2rem;
+  }
+  
+  .state-card {
+    width: 150px;
+    height: 100px;
+    padding: 0.75rem;
   }
 }
 
@@ -356,4 +368,126 @@ input:focus, textarea:focus, select:focus {
 
 .tooltip:hover::before {
   opacity: 1;
+}
+
+/* Map specific styles */
+.india-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Payment success/error styles */
+.payment-status {
+  animation: slideUp 0.5s ease-out;
+}
+
+.payment-status.success {
+  color: #059669;
+}
+
+.payment-status.error {
+  color: #dc2626;
+}
+
+.payment-status.pending {
+  color: #d97706;
+}
+
+/* Enhanced card styles for better visual hierarchy */
+.elevated-card {
+  background: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.elevated-card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+}
+
+/* State positioning for 2D map */
+.map-punjab { top: 5%; left: 25%; }
+.map-rajasthan { top: 15%; left: 10%; }
+.map-gujarat { top: 40%; left: 5%; }
+.map-maharashtra { top: 45%; left: 25%; }
+.map-karnataka { top: 70%; left: 20%; }
+.map-kerala { top: 80%; left: 15%; }
+.map-tamil-nadu { top: 75%; left: 35%; }
+.map-west-bengal { top: 30%; right: 10%; }
+
+/* Responsive map adjustments */
+@media (max-width: 1024px) {
+  .state-card {
+    width: 120px;
+    height: 80px;
+    padding: 0.5rem;
+  }
+  
+  .state-card h3 {
+    font-size: 0.875rem;
+  }
+  
+  .state-card span {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.375rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .state-card {
+    width: 100px;
+    height: 70px;
+    padding: 0.375rem;
+  }
+  
+  .state-card h3 {
+    font-size: 0.75rem;
+  }
+}
+
+/* Enhanced hover states for better UX */
+.interactive-element {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.interactive-element:hover {
+  transform: scale(1.02);
+}
+
+.interactive-element:active {
+  transform: scale(0.98);
+}
+
+/* Loading skeleton styles */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+/* Success checkmark animation */
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.checkmark-animation {
+  animation: checkmark 0.6s ease-out;
 }
