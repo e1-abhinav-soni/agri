@@ -129,30 +129,55 @@ function getUrlParameter(name) {
 
 // User Profile Component
 const UserProfile = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for authentication callback
+    // Check for authentication callback first
     const fragment = window.location.hash;
     if (fragment.includes('session_id=')) {
-      // This will be handled by AuthProvider
+      // This will be handled by AuthProvider, just wait
       return;
     }
     
-    // If no auth callback and no user, redirect to home
-    if (!user) {
+    // If no auth callback and still loading, wait
+    if (loading) {
+      return;
+    }
+    
+    // If not loading and no user, redirect to home
+    if (!loading && !user) {
+      console.log('No user found, redirecting to home');
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
 
-  if (!user) {
+  // Show loading state while processing authentication
+  if (loading || window.location.hash.includes('session_id=')) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-500 mx-auto mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Setting up your account...</h2>
           <p className="text-gray-600">Please wait while we complete your authentication.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Authentication Failed</h2>
+          <p className="text-gray-600 mb-6">Unable to complete authentication. Please try again.</p>
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl transition-colors duration-200"
+          >
+            Back to Home
+          </button>
         </div>
       </div>
     );
