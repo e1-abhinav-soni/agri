@@ -223,6 +223,8 @@ def main():
         ("Get Cart", tester.test_get_cart),
         ("Update Cart", tester.test_update_cart_quantity),
         ("Remove from Cart", tester.test_remove_from_cart),
+        ("Checkout Session", tester.test_checkout_create_session),
+        ("Invalid Checkout Status", tester.test_checkout_status_invalid),
         ("Error Handling", tester.test_invalid_endpoints),
     ]
     
