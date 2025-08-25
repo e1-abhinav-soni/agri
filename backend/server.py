@@ -131,7 +131,15 @@ async def get_current_user(
     
     # Find session in database
     session = await db.user_sessions.find_one({"session_token": token})
-    if not session or session["expires_at"] < datetime.utcnow():
+    if not session:
+        return None
+    
+    # Convert expires_at string back to datetime for comparison
+    expires_at = session["expires_at"]
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+    
+    if expires_at < datetime.utcnow():
         return None
     
     # Get user data
