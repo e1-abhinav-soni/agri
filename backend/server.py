@@ -340,6 +340,9 @@ async def authenticate_user(auth_request: AuthRequest, request: Request):
         
         return response
         
+    except HTTPException:
+        # Re-raise HTTPExceptions (like 401) as-is
+        raise
     except Exception as e:
         logging.error(f"Authentication error: {str(e)}")
         raise HTTPException(status_code=500, detail="Authentication failed")
