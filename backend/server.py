@@ -591,6 +591,9 @@ async def get_checkout_status(session_id: str):
             "inr_amount": transaction["amount"]
         }
         
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
     except Exception as e:
         logging.error(f"Error checking payment status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
