@@ -270,12 +270,16 @@ async def authenticate_user(auth_request: AuthRequest, request: Request):
         
         if not existing_user:
             # Create new user
-            user = User(
-                email=auth_data["email"],
-                name=auth_data["name"],
-                picture=auth_data.get("picture")
-            )
-            await db.users.insert_one(user.dict())
+            user_data = {
+                "id": str(uuid.uuid4()),
+                "email": auth_data["email"],
+                "name": auth_data["name"],
+                "picture": auth_data.get("picture"),
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            user = User(**user_data)
+            await db.users.insert_one(jsonable_encoder(user))
             user_id = user.id
         else:
             user_id = existing_user["id"]
@@ -285,19 +289,22 @@ async def authenticate_user(auth_request: AuthRequest, request: Request):
         session_token = auth_data["session_token"]
         expires_at = datetime.utcnow() + timedelta(days=7)
         
-        user_session = UserSession(
-            user_id=user_id,
-            session_token=session_token,
-            expires_at=expires_at
-        )
+        user_session_data = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "session_token": session_token,
+            "expires_at": expires_at,
+            "created_at": datetime.utcnow()
+        }
         
-        await db.user_sessions.insert_one(user_session.dict())
+        user_session = UserSession(**user_session_data)
+        await db.user_sessions.insert_one(jsonable_encoder(user_session))
         
         # Create response with HttpOnly cookie
-        response = JSONResponse({
+        response = JSONResponse(jsonable_encoder({
             "user": user.dict(),
             "message": "Authentication successful"
-        })
+        }))
         
         response.set_cookie(
             key="session_token",
