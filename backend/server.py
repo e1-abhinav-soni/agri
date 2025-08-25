@@ -526,6 +526,12 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
         session = await stripe_checkout.create_checkout_session(checkout_request)
         
         # Create payment transaction record
+        transaction_metadata = {
+            "usd_amount": str(usd_amount),
+            "stripe_session_id": session.session_id,
+            "user_email": current_user.email if current_user else "guest"
+        }
+        
         payment_transaction = PaymentTransaction(
             session_id=session.session_id,
             amount=total_amount,
@@ -534,11 +540,7 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
             user_session=checkout_req.user_session,
             user_id=current_user.id if current_user else None,
             cart_items=product_ids,
-            metadata={
-                "usd_amount": str(usd_amount),
-                "stripe_session_id": session.session_id,
-                "user_email": current_user.email if current_user else None
-            }
+            metadata=transaction_metadata
         )
         
         await db.payment_transactions.insert_one(payment_transaction.dict())
