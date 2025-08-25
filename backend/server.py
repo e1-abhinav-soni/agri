@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Cookie
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -9,7 +10,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import aiohttp
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
@@ -26,7 +28,28 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Security
+security = HTTPBearer(auto_error=False)
+
 # Define Models
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    name: str
+    picture: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserSession(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    session_token: str
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class AuthRequest(BaseModel):
+    session_id: str
+
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -54,7 +77,8 @@ class CartItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     product_id: str
     quantity: int
-    user_session: str  # For now, using session-based cart
+    user_id: Optional[str] = None  # For authenticated users
+    user_session: str  # For guest users
 
 class CartItemCreate(BaseModel):
     product_id: str
@@ -74,6 +98,7 @@ class PaymentTransaction(BaseModel):
     currency: str
     payment_status: str  # pending, paid, failed
     user_session: str
+    user_id: Optional[str] = None
     cart_items: List[str]  # product IDs
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -82,6 +107,37 @@ class PaymentTransaction(BaseModel):
 class CheckoutRequest(BaseModel):
     origin_url: str
     user_session: str
+
+# Auth helper functions
+async def get_current_user(
+    request: Request,
+    session_token: Optional[str] = Cookie(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> Optional[User]:
+    """Get current user from session token in cookie or Authorization header"""
+    token = None
+    
+    # Try to get token from cookie first
+    if session_token:
+        token = session_token
+    # Fallback to Authorization header
+    elif credentials:
+        token = credentials.credentials
+    
+    if not token:
+        return None
+    
+    # Find session in database
+    session = await db.user_sessions.find_one({"session_token": token})
+    if not session or session["expires_at"] < datetime.utcnow():
+        return None
+    
+    # Get user data
+    user = await db.users.find_one({"id": session["user_id"]})
+    if user:
+        return User(**user)
+    
+    return None
 
 # Sample data for Indian states and their agricultural products
 STATES_DATA = {
@@ -190,6 +246,92 @@ async def startup_event():
 async def root():
     return {"message": "AgriMap Market API"}
 
+# Authentication Routes
+@api_router.post("/auth/login")
+async def authenticate_user(auth_request: AuthRequest, request: Request):
+    """Authenticate user with Emergent session ID"""
+    try:
+        # Call Emergent auth API
+        async with aiohttp.ClientSession() as session:
+            headers = {"X-Session-ID": auth_request.session_id}
+            async with session.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers=headers
+            ) as response:
+                if response.status != 200:
+                    raise HTTPException(status_code=401, detail="Invalid session")
+                
+                auth_data = await response.json()
+        
+        # Check if user exists
+        existing_user = await db.users.find_one({"email": auth_data["email"]})
+        
+        if not existing_user:
+            # Create new user
+            user = User(
+                email=auth_data["email"],
+                name=auth_data["name"],
+                picture=auth_data.get("picture")
+            )
+            await db.users.insert_one(user.dict())
+            user_id = user.id
+        else:
+            user_id = existing_user["id"]
+            user = User(**existing_user)
+        
+        # Create session
+        session_token = auth_data["session_token"]
+        expires_at = datetime.utcnow() + timedelta(days=7)
+        
+        user_session = UserSession(
+            user_id=user_id,
+            session_token=session_token,
+            expires_at=expires_at
+        )
+        
+        await db.user_sessions.insert_one(user_session.dict())
+        
+        # Create response with HttpOnly cookie
+        response = JSONResponse({
+            "user": user.dict(),
+            "message": "Authentication successful"
+        })
+        
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            max_age=7*24*60*60,  # 7 days
+            httponly=True,
+            secure=True,
+            samesite="none",
+            path="/"
+        )
+        
+        return response
+        
+    except Exception as e:
+        logging.error(f"Authentication error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
+
+@api_router.post("/auth/logout")
+async def logout_user(request: Request, current_user: Optional[User] = Depends(get_current_user)):
+    """Logout user and invalidate session"""
+    if current_user:
+        session_token = request.cookies.get("session_token")
+        if session_token:
+            await db.user_sessions.delete_one({"session_token": session_token})
+    
+    response = JSONResponse({"message": "Logged out successfully"})
+    response.delete_cookie("session_token", path="/")
+    return response
+
+@api_router.get("/auth/me")
+async def get_current_user_info(current_user: Optional[User] = Depends(get_current_user)):
+    """Get current user information"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return current_user
+
 @api_router.get("/states", response_model=dict)
 async def get_states():
     return STATES_DATA
@@ -219,17 +361,24 @@ async def get_product(product_id: str):
     return Product(**product)
 
 @api_router.post("/cart/add", response_model=CartItem)
-async def add_to_cart(cart_item: CartItemCreate):
+async def add_to_cart(cart_item: CartItemCreate, current_user: Optional[User] = Depends(get_current_user)):
     # Verify product exists
     product = await db.products.find_one({"id": cart_item.product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
+    # Set user_id if authenticated
+    user_id = current_user.id if current_user else None
+    
     # Check if item already exists in cart
-    existing_item = await db.cart_items.find_one({
-        "product_id": cart_item.product_id,
-        "user_session": cart_item.user_session
-    })
+    query = {"product_id": cart_item.product_id}
+    if user_id:
+        query["user_id"] = user_id
+    else:
+        query["user_session"] = cart_item.user_session
+        query["user_id"] = None
+    
+    existing_item = await db.cart_items.find_one(query)
     
     if existing_item:
         # Update quantity
@@ -242,13 +391,22 @@ async def add_to_cart(cart_item: CartItemCreate):
         return CartItem(**existing_item)
     else:
         # Create new cart item
-        cart_item_obj = CartItem(**cart_item.dict())
+        cart_item_dict = cart_item.dict()
+        cart_item_dict["user_id"] = user_id
+        cart_item_obj = CartItem(**cart_item_dict)
         await db.cart_items.insert_one(cart_item_obj.dict())
         return cart_item_obj
 
 @api_router.get("/cart/{user_session}", response_model=List[dict])
-async def get_cart(user_session: str):
-    cart_items = await db.cart_items.find({"user_session": user_session}).to_list(1000)
+async def get_cart(user_session: str, current_user: Optional[User] = Depends(get_current_user)):
+    # Get cart items for user (authenticated or guest)
+    if current_user:
+        cart_items = await db.cart_items.find({"user_id": current_user.id}).to_list(1000)
+    else:
+        cart_items = await db.cart_items.find({
+            "user_session": user_session,
+            "user_id": None
+        }).to_list(1000)
     
     # Enrich cart items with product details
     enriched_items = []
@@ -264,23 +422,34 @@ async def get_cart(user_session: str):
     return enriched_items
 
 @api_router.delete("/cart/{user_session}/{product_id}")
-async def remove_from_cart(user_session: str, product_id: str):
-    result = await db.cart_items.delete_one({
-        "product_id": product_id,
-        "user_session": user_session
-    })
+async def remove_from_cart(user_session: str, product_id: str, current_user: Optional[User] = Depends(get_current_user)):
+    query = {"product_id": product_id}
+    if current_user:
+        query["user_id"] = current_user.id
+    else:
+        query["user_session"] = user_session
+        query["user_id"] = None
+    
+    result = await db.cart_items.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Cart item not found")
     return {"message": "Item removed from cart"}
 
 @api_router.put("/cart/{user_session}/{product_id}")
-async def update_cart_quantity(user_session: str, product_id: str, quantity: int):
+async def update_cart_quantity(user_session: str, product_id: str, quantity: int, current_user: Optional[User] = Depends(get_current_user)):
     if quantity <= 0:
         # Remove item if quantity is 0 or negative
-        return await remove_from_cart(user_session, product_id)
+        return await remove_from_cart(user_session, product_id, current_user)
+    
+    query = {"product_id": product_id}
+    if current_user:
+        query["user_id"] = current_user.id
+    else:
+        query["user_session"] = user_session
+        query["user_id"] = None
     
     result = await db.cart_items.update_one(
-        {"product_id": product_id, "user_session": user_session},
+        query,
         {"$set": {"quantity": quantity}}
     )
     if result.modified_count == 0:
@@ -289,10 +458,17 @@ async def update_cart_quantity(user_session: str, product_id: str, quantity: int
 
 # Stripe Payment Integration
 @api_router.post("/checkout/create-session")
-async def create_checkout_session(request: Request, checkout_req: CheckoutRequest):
+async def create_checkout_session(request: Request, checkout_req: CheckoutRequest, current_user: Optional[User] = Depends(get_current_user)):
     try:
-        # Get cart items
-        cart_items = await db.cart_items.find({"user_session": checkout_req.user_session}).to_list(1000)
+        # Get cart items based on authentication status
+        if current_user:
+            cart_items = await db.cart_items.find({"user_id": current_user.id}).to_list(1000)
+        else:
+            cart_items = await db.cart_items.find({
+                "user_session": checkout_req.user_session,
+                "user_id": None
+            }).to_list(1000)
+        
         if not cart_items:
             raise HTTPException(status_code=400, detail="Cart is empty")
         
@@ -332,6 +508,8 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
             cancel_url=cancel_url,
             metadata={
                 "user_session": checkout_req.user_session,
+                "user_id": current_user.id if current_user else None,
+                "user_email": current_user.email if current_user else None,
                 "product_ids": ",".join(product_ids),
                 "inr_amount": str(total_amount)
             }
@@ -346,10 +524,12 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
             currency="INR",
             payment_status="pending",
             user_session=checkout_req.user_session,
+            user_id=current_user.id if current_user else None,
             cart_items=product_ids,
             metadata={
                 "usd_amount": str(usd_amount),
-                "stripe_session_id": session.session_id
+                "stripe_session_id": session.session_id,
+                "user_email": current_user.email if current_user else None
             }
         )
         
@@ -390,7 +570,10 @@ async def get_checkout_status(session_id: str):
             
             # Clear cart if payment successful
             if checkout_status.payment_status == "paid":
-                await db.cart_items.delete_many({"user_session": transaction["user_session"]})
+                if transaction["user_id"]:
+                    await db.cart_items.delete_many({"user_id": transaction["user_id"]})
+                else:
+                    await db.cart_items.delete_many({"user_session": transaction["user_session"]})
         
         return {
             "status": checkout_status.status,
