@@ -137,7 +137,13 @@ async def get_current_user(
     # Convert expires_at string back to datetime for comparison
     expires_at = session["expires_at"]
     if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        # Remove any timezone info and parse
+        expires_at_str = expires_at.replace('Z', '').split('.')[0]  # Remove microseconds and Z
+        try:
+            expires_at = datetime.fromisoformat(expires_at_str)
+        except ValueError:
+            # If parsing fails, treat as expired
+            return None
     
     if expires_at < datetime.utcnow():
         return None
