@@ -16,7 +16,65 @@ const API = `${BACKEND_URL}/api`;
 // Generate a simple session ID for cart management
 const SESSION_ID = 'session_' + Math.random().toString(36).substr(2, 9);
 
-// 3D India Map Component
+// 2D Fallback Map Component
+const IndiaMap2D = ({ onStateClick }) => {
+  const [states, setStates] = useState({});
+
+  useEffect(() => {
+    const fetchStates = async () => {
+      try {
+        const response = await axios.get(`${API}/states`);
+        setStates(response.data);
+      } catch (error) {
+        console.error('Error fetching states:', error);
+      }
+    };
+    fetchStates();
+  }, []);
+
+  const stateColors = {
+    'Punjab': '#22c55e',
+    'Maharashtra': '#3b82f6', 
+    'Kerala': '#10b981',
+    'Tamil Nadu': '#f59e0b',
+    'Karnataka': '#8b5cf6',
+    'West Bengal': '#ef4444',
+    'Gujarat': '#06b6d4',
+    'Rajasthan': '#f97316'
+  };
+
+  return (
+    <div className="relative w-full h-full bg-gradient-to-br from-blue-100 to-green-100 rounded-3xl p-8 flex items-center justify-center">
+      <div className="grid grid-cols-3 gap-4 max-w-2xl w-full">
+        {Object.entries(states).map(([key, state]) => (
+          <div
+            key={key}
+            onClick={() => onStateClick(key, state)}
+            className="bg-white rounded-2xl p-6 shadow-lg cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
+            style={{
+              borderLeft: `6px solid ${stateColors[state.name] || '#64748b'}`
+            }}
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-2">{state.name}</h3>
+            <p className="text-gray-600 text-sm mb-3">{state.description}</p>
+            <div className="flex flex-wrap gap-1">
+              {state.agricultural_products?.slice(0, 3).map((product, index) => (
+                <span key={index} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">
+                  {product}
+                </span>
+              ))}
+              {state.agricultural_products?.length > 3 && (
+                <span className="text-xs text-gray-500">+{state.agricultural_products.length - 3} more</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// 3D India Map Component (with error handling)
 const IndiaState = ({ position, name, color, onClick, hovered, onHover, onUnhover }) => {
   return (
     <mesh
