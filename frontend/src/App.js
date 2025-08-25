@@ -197,7 +197,7 @@ const ShoppingCart = ({ isOpen, onClose, cartItems, onUpdateQuantity, onRemoveIt
         <div className="overflow-y-auto max-h-96 p-6">
           {cartItems.length === 0 ? (
             <div className="text-center py-8">
-              <ShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <CartIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
               <p className="text-gray-500">Your cart is empty</p>
             </div>
           ) : (
