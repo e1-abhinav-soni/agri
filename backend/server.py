@@ -541,18 +541,22 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
             "user_email": current_user.email if current_user else "guest"
         }
         
-        payment_transaction = PaymentTransaction(
-            session_id=session.session_id,
-            amount=total_amount,
-            currency="INR",
-            payment_status="pending",
-            user_session=checkout_req.user_session,
-            user_id=current_user.id if current_user else None,
-            cart_items=product_ids,
-            metadata=transaction_metadata
-        )
+        payment_transaction_data = {
+            "id": str(uuid.uuid4()),
+            "session_id": session.session_id,
+            "amount": total_amount,
+            "currency": "INR",
+            "payment_status": "pending",
+            "user_session": checkout_req.user_session,
+            "user_id": current_user.id if current_user else None,
+            "cart_items": product_ids,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "metadata": transaction_metadata
+        }
         
-        await db.payment_transactions.insert_one(payment_transaction.dict())
+        payment_transaction = PaymentTransaction(**payment_transaction_data)
+        await db.payment_transactions.insert_one(jsonable_encoder(payment_transaction))
         
         return {"url": session.url, "session_id": session.session_id}
         
