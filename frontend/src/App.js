@@ -8,7 +8,7 @@ import axios from 'axios';
 import './App.css';
 
 // Import icons from lucide-react
-import { ShoppingCart, X, Plus, Minus, Package, MapPin, Star } from 'lucide-react';
+import { ShoppingCart as CartIcon, X, Plus, Minus, Package, MapPin, Star } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
