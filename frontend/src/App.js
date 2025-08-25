@@ -323,6 +323,7 @@ function App() {
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [use3DMap, setUse3DMap] = useState(true);
 
   // Fetch cart items
   const fetchCartItems = async () => {
