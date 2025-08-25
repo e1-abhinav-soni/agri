@@ -100,8 +100,8 @@ class PaymentTransaction(BaseModel):
     user_session: str
     user_id: Optional[str] = None
     cart_items: List[str]  # product IDs
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     metadata: Optional[Dict[str, str]] = None
 
 class CheckoutRequest(BaseModel):
