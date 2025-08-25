@@ -585,6 +585,9 @@ async def create_checkout_session(request: Request, checkout_req: CheckoutReques
         
         return {"url": session.url, "session_id": session.session_id}
         
+    except HTTPException:
+        # Re-raise HTTPExceptions (like 400) as-is
+        raise
     except Exception as e:
         logging.error(f"Error creating checkout session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
